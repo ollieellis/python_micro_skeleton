@@ -1,0 +1,12 @@
+#code quality
+isort
+black
+pylint
+pytest
+
+#app
+fastapi
+uvicorn
+loguru
+pyyaml
+pydantic_yaml
