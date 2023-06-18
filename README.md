@@ -1,6 +1,6 @@
-# Python FastAPI template/skeleton #
+# Python Microsevice template/skeleton #
 
-* for use as a base for my FastAPI projects
+* for use as a base for my python microservices
 * it includes a basic endpoint, a Dockerfile, and a pytest test.
 * black pylint and isort are used for linting and formatting (can reduce merge confilcts)
 
