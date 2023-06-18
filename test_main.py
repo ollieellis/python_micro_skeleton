@@ -5,7 +5,7 @@ from main import MyApp, app
 
 
 class TestConstructPayload:
-    #note we test the function not the endpoint
+    # note we test the function not the endpoint
     def test_happy(self):
         assert MyApp.construct_payload("test", 1) == "endpoint called with payload: test 1"
 
