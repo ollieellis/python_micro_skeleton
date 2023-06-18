@@ -10,3 +10,4 @@ uvicorn
 loguru
 pyyaml
 pydantic_yaml
+httpx

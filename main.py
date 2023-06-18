@@ -1,70 +1,79 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from loguru import logger
 from pydantic import BaseModel
 from pydantic_yaml import YamlModel
 
 
-class payload(BaseModel):  # start working with the xml jaki sent over asap!!
+class Payload(BaseModel):
+    """mocks the payloads to your endpoints to control the typing of the incoming json objects"""
     string: str
-    intiger: int
+    integer: int
 
-class config(YamlModel):
+
+class Config(YamlModel):
+    "Allows easy config of the app via a yaml file: see start_up()"
     mockMode: bool
     debugMode: bool
 
-#as app grows change globals to be a class
-def constructPayload(string: str, intiger: int) -> str:
-    """dummy func to ensure get function cleanyness"""
-    return "endpoint called with payload: " + string + " " + intiger
+
+class MyApp:
+    def __init__(self, configFile: str = "config/config.yaml"):
+        self.config = Config.parse_file(configFile)
+        self.router = APIRouter()
+        self.router.add_api_route("/endpoint", self.endpoint, methods=["POST"])
+        self.router.add_api_route("/liveness", self.liveness, methods=["GET"])
+        self.router.add_api_route("/readiness", self.liveness, methods=["GET"])
+        # self.app = FastAPI(lifespan=self.lifespan)
+
+    def endpoint(self, payload: Payload):
+        print(payload)
+        if self.config.mockMode:
+            return {"message": "mock_mode enabled"}
+        else:
+            response = self.construct_payload(payload.string, payload.integer)
+            return {"message": response}
+    
+    @staticmethod
+    def construct_payload(string: str, integer: int) -> str:
+        """dummy func to ensure get function cleanliness"""
+        return f"endpoint called with payload: {string} {integer}"
+    
+    @asynccontextmanager
+    async def lifespan(self, app: FastAPI):
+        """Handle the start_up/shut_down of app (pre/post *yield* keyword)"""
+        try:
+            self.start_up()
+            app.include_router(self.router)
+            logger.info("app started with config: " + str(self.config))
+        except Exception as e:
+            logger.critical("failed to start up app: " + str(e))
+            exit()
+        yield
+        self.shut_down()
+
+    def start_up(self):
+        """called on app start up"""
+        self.config = Config.parse_file("config/config.yaml")
+        # self.app.include_router(self.router)
 
 
-def startUp():
-    """called on app start up"""
-    global cfg # global so dont have to read on api calls
-    cfg = config.parse_file("config/config.yaml")
-    return
+    def shut_down(self):
+        """called on app shut down"""
+        logger.info("app gracefully shutting down")
 
+    def liveness(self):
+        """kubernetes liveliness probe"""
+        return {"status": "ok"}
 
-def shutDown():
-    """called on app shut down"""
-    logger.info("app gracefully shutting down")
-    return
+    def readiness(self):
+        """kubernetes readiness probe"""
+        return {"status": "ok"}
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Handle the startUp/shutDown of app (pre/post *yield* keyword)"""
-    try:
-        startUp()
-        logger.info("app started with config: " + str(cfg))
-    except Exception as e:
-        logger.critical("failed to start up app", print(str(e)))
-        exit()
-    yield
-    shutDown()
-
-
-app = FastAPI(lifespan=lifespan)
-
-
-@app.get("/endpoint")
-def endpoint(payload: payload):
-    if cfg.mockMode:
-        return {"message": "mock_mode enabled"}  
-    else:
-        responce = constructPayload(payload.string, payload.intiger)
-        return {"message": responce}
-
-
-# these probes are actually quite powerful and should look into better utilising them
-@app.get("/liveness")
-def liveness():
-    """kubernetes livenss probe"""
-    return {"status": "ok"}
-
-
-@app.get("/readiness")
-def readiness():
-    """kubernetes readyness probe"""
-    return {"status": "ok"}
+#uvicorn looks for a fastApi object called app in main.py
+#uvicorn main:app 
+# my_app = MyApp("config/config.yaml")
+# app = my_app.app
+my_app = MyApp("config/config.yaml")
+app = FastAPI(lifespan=my_app.lifespan)
+# app.include_router(my_app.router)
